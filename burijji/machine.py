@@ -48,6 +48,8 @@ class BurijjiMachine(object):
         self._mutex.acquire()
         self._info_subscribers.append(fileno)
         self._mutex.release()
+
+        if 'start_print' in self._routines: self._send_commands(self._routines['start_print'])
         self._print_file(data)
 
     def pause_print(self, fileno, data):

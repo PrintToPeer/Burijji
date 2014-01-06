@@ -16,6 +16,7 @@ class repWrapper(BurijjiMachine):
     def _update(self):
         printer        = self.__printer
         printer.recvcb = self._parse_line
+        printer.endcb  = self._end_print
         printer.connect(self._server.port, self._server.baud)
         sleep(1)
         printer.send_now('M115')
@@ -39,6 +40,9 @@ class repWrapper(BurijjiMachine):
     def _print_file(self, data):
         gcoder.GCode([i.strip() for i in open(data)])
         self.__printer.startprint(gcode)
+
+    def _end_print(self):
+        if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
 
     def _pause_print(self):
         self.__printer.pause()
