@@ -44,6 +44,10 @@ class repWrapper(BurijjiMachine):
     def _end_print(self):
         if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
 
+    def _stop_print(self):
+        self.__printer.pause()
+        self._end_print()
+
     def _pause_print(self):
         self.__printer.pause()
 

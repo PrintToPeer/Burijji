@@ -29,7 +29,7 @@ class BurijjiServer():
         self.__unpackers       = {}
         self.__mutex           = threading.Lock()
         self._operations       = ['machine_info', 'send_commands', 'print_file', 'pause_print', 'resume_print']
-        self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe']
+        self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe', 'stop_print']
 
         if self.vid == '23c1':
             from mbWrapper import mbWrapper

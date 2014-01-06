@@ -52,19 +52,23 @@ class BurijjiMachine(object):
         if 'start_print' in self._routines: self._send_commands(self._routines['start_print'])
         self._print_file(data)
 
+    def stop_print(self, fileno, data):
+        self._stop_print()
+
     def pause_print(self, fileno, data):
         if self._printing:
             self._pause_print()
-            if 'pause' in self._routines: self._send_commands(self._routines['pause'])
+            if 'pause' in self._routines: self._send_commands(self._routines['pause_print'])
 
     def resume_print(self, fileno, data):
         if self._paused:
-            if 'resume' in self._routines: self._send_commands(self._routines['resume'])
+            if 'resume' in self._routines: self._send_commands(self._routines['resume_print'])
             self._resume_print()
 
     def run_routine(self, fileno, data):
         if data in self._routines:
             self._send_commands(self._routines[data])
+        else: self._server.add_to_queue(fileno, {'action': 'routine_error', 'data': 'routine not defined'})
 
     def update_routines(self, fileno, data):
         if type(data) is dict:
