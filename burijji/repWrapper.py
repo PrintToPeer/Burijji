@@ -1,27 +1,51 @@
-from printrun.printcore import printcore
-from printrun.GCodeAnalyzer import GCodeAnalyzer
-from time import sleep
-import threading
+from printrun.printcore     import printcore
+from printrun               import gcoder
+from machine                import BurijjiMachine
+from time                   import sleep
+import re
 
-class repWrapper():
+class repWrapper(BurijjiMachine):
+    _temp_exp = re.compile("([TB]\d*):([-+]?\d*\.?\d*)")
 
-	def __init__(self, server):
-		self.printer    = printcore()
-		self.__server   = server
-		self.__analyzer = GCodeAnalyzer()
+    def __init__(self, server):
+        super(repWrapper, self).__init__(server)
+        self.__printer     = printcore()
+        self._machine_info = {'type': 'RepRap', 'model':  'Unknown'}
 
-		self.__mutex    = threading.Lock()
+    def _update(self):
+        printer        = self.__printer
+        printer.recvcb = self._parse_line
+        printer.connect(self._server.port, self._server.baud)
 
-	def start(self):
-		threading.Thread(target=self.__run)
+        while self._server.running:
+            sleep(1)
+            printer.send_now('M105')
+            self._mutex.acquire()
+            self._current_line = printer.queueindex
+            self._printing     = printer.printing
+            self._paused       = printer.paused
+            self._mutex.release()
 
-	def stop(self):
-		pass
+        self.__printer.disconnect()
 
-	def __run(self):
-		self.printer.connect(self.__server.port, self.__server.baud)
+    def _send_commands(self, commands):
+        for command in commands:
+            self.__printer.send_now(command)
 
-		while self.server.running:
-			sleep(1)
+    def _print_file(self, data):
+        gcoder.GCode([i.strip() for i in open(data)])
+        self.__printer.startprint(gcode)
 
-		self.printer.disconnect()
+    def _pause_print(self):
+        self.__printer.pause()
+
+    def _reumse_print(self):
+        self.__printer.resume()
+
+    def _parse_line(self, line):
+        matches = self._temp_exp.findall(line)
+        temps   = dict((m[0], float(m[1])) for m in matches)
+
+        self._mutex.acquire()
+        self._temperatures.update(temps)
+        self._mutex.release()

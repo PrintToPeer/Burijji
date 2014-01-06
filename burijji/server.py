@@ -2,13 +2,14 @@ import os, sys, socket, select, threading, msgpack, serial
 import serial.tools.list_ports as lp
 from collections import deque
 from time        import time
+from time        import sleep
 
 class BurijjiServer():
     __tmp_dir  = '/tmp/PrintToPeer'
     __epoll_ro = (select.EPOLLIN | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR)
     __epoll_rw = __epoll_ro | select.EPOLLOUT
 
-    def __init__(self, port, baud):
+    def __init__(self, port, baud = 115200):
         self.port              = port
         self.baud              = baud
         self.port_name         = self.port.split('/')[-1]
@@ -27,38 +28,43 @@ class BurijjiServer():
         self.__connections     = {}
         self.__unpackers       = {}
         self.__mutex           = threading.Lock()
+        self._operations       = ['machine_info', 'send_commands', 'print_file', 'pause_print', 'resume_print']
+        self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe']
 
         if self.vid == '23c1':
             from mbWrapper import mbWrapper
-            self.machine = mbWrapper(self)
+            self.__machine = mbWrapper(self)
         else:
             from repWrapper import repWrapper
-            self.machine = repWrapper(self)
+            self.__machine = repWrapper(self)
 
         if not os.path.exists(self.__tmp_dir): os.makedirs(self.__tmp_dir)
         if not os.path.exists(self.__tmp_dir+'/socks'): os.makedirs(self.__tmp_dir+'/socks')
 
     def start(self):
-        thread = threading.Thread(target=self.__run)
-        thread.start()
+        threading.Thread(target=self.__run).start()
 
     def stop(self):
         self.running = False
 
     def add_to_queue(self, fileno, data):
-        timestamp = int(time())
-        self.__mutex.aquire()
-        self.__outbound_queues[fileno].append([data, timestamp])
-        self.__mutex.release()
+        try:
+            self.__mutex.acquire()
+            self.__outbound_queues[fileno].append(data)
+        except:
+            pass
+        finally:
+            self.__mutex.release()
 
     def __run(self):
-        self.machine.start()
+        self.__machine.start()
         self.__setup_server()
 
         while self.running:
-            events = self.__epoll.poll(0.25)
+            sleep(0.01)
+            events = self.__epoll.poll(0.01)
             for fileno, event in events: 
-                if fileno == self.serversocket.fileno():          self.__setup_connection(self.serversocket.accept()[0])
+                if fileno == self.__socketserver.fileno():        self.__setup_connection(self.__socketserver.accept()[0])
                 elif event & select.EPOLLOUT:                     self.__send(fileno)
                 elif event & (select.EPOLLIN  | select.EPOLLPRI): self.__recv(fileno)
                 elif event & (select.EPOLLHUP | select.EPOLLERR): self.__teardown_connection(fileno)
@@ -93,12 +99,14 @@ class BurijjiServer():
     def __teardown_connection(self, fileno):
         self.__epoll.unregister(fileno)
         self.__connections[fileno].close()
-        del self.__connections[fileno]
-        del self.__unpackers[fileno]
-        del self.__outbound_queues[fileno]
+        if self.running:
+            self.__machine.unsubscribe(fileno, {'type': 'all'})
+            del self.__connections[fileno]
+            del self.__unpackers[fileno]
+            del self.__outbound_queues[fileno]
 
     def __send(self, fileno):
-        self.__mutex.aquire()
+        self.__mutex.acquire()
         if len(self.__outbound_queues[fileno]) == 0:
             self.__mutex.release()
             return(None)
@@ -122,11 +130,11 @@ class BurijjiServer():
             self.__epoll.modify(fileno, self.__epoll_rw)
             unpacker.feed(data)
             for pack in unpacker:
-                try:
-                    getattr(self.machine, pack['action'])(fileno, pack['payload'])
-                except KeyError:
-                    self.add_to_queue(fileno, {'action': 'error', 'payload': 'Malformed data.'})
-                except AttributeError:
-                    self.add_to_queue(fileno, {'action': 'error', 'payload': 'Invalid action.'})
+                if type(pack) is not dict or 'action' not in pack or 'data' not in pack:
+                    self.__machine.bad_data_sent(fileno)
+                elif pack['action'] not in self._operations:
+                    self.add_to_queue(fileno, {'action': 'action_error', 'data': 'Invalid action.'})
+                else:
+                    getattr(self.__machine, pack['action'])(fileno, pack['data'])
         else:
             self.__teardown_connection(fileno)
