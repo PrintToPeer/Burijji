@@ -13,7 +13,8 @@ class mbWrapper(BurijjiMachine):
         self.__parser        = getattr(self.__printer, 'gcodeparser')
         self.__command_queue = deque()
         self._command_mutex  = threading.Lock()
-        self._machine_info   = {'type': 'MakerBot', 'model':  self.__printer.profile.name}
+        heated_bed           = len(self.__printer.profile.values['heated_platforms']) > 0
+        self._machine_info   = {'type': 'MakerBot', 'model':  self.__printer.profile.name, 'extruder_count': len(self.__printer.profile.values['tools']), 'heated_bed': heated_bed}
         self._print_data     = None
 
     def _update(self):
@@ -21,11 +22,19 @@ class mbWrapper(BurijjiMachine):
 
         while self._server.running:
             sleep(1)
-            t0_temp  = float(printer.s3g.get_toolhead_temperature(0))
-            t1_temp  = float(printer.s3g.get_toolhead_temperature(1))
-            bed_temp = float(printer.s3g.get_platform_temperature(0))
+            temps = {}
+
+            if self._machine_info['extruder_count'] is 1:
+                temps['t'] = float(printer.s3g.get_toolhead_temperature(0))
+            else:
+                for i in xrange(self._machine_info['extruder_count']):
+                    temps['t'+str(i)] = float(printer.s3g.get_toolhead_temperature(i))
+
+            if self._machine_info['heated_bed']:
+                temps['b'] = float(printer.s3g.get_platform_temperature(0))
+
             self._mutex.acquire()
-            self._temperatures = {'B': bed_temp, 'T0': t0_temp, 'T1': t1_temp}
+            self._temperatures.update(temps)
             self._mutex.release()
 
     def _send_commands(self, commands):
