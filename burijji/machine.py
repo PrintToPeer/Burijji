@@ -46,7 +46,7 @@ class BurijjiMachine(object):
 
     def print_file(self, fileno, data):
         self._mutex.acquire()
-        self._info_subscribers.append(fileno)
+        if fileno not in self._info_subscribers: self._info_subscribers.append(fileno)
         self._mutex.release()
 
         if 'start_print' in self._routines: self._send_commands(self._routines['start_print'])
