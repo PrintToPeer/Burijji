@@ -111,7 +111,7 @@ class mbWrapper(BurijjiMachine):
             try:
                 self.__parser.execute_line(command)
                 break
-            except (makerbot_driver.BufferOverflowError, makerbot_driver.ProtocolError): sleep(0.2)
             except (makerbot_driver.BuildCancelledError, makerbot_driver.ActiveBuildError):
                 self._cancel_print()
                 break
+            except: sleep(0.2)
