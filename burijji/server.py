@@ -16,7 +16,7 @@ class BurijjiServer():
 
         hw_info                = lp.hwinfo(self.port)
         vid_pid                = hw_info.split('PID=')[1].split()[0]
-        self.serial_id         = hw_info.split('SNR=')[1]
+        self.iserial           = hw_info.split('SNR=')[1]
         self.vid               = vid_pid.split(':')[0]
         self.pid               = vid_pid.split(':')[1]
 
