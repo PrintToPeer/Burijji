@@ -8,7 +8,7 @@ class BurijjiServer():
     __epoll_ro = (select.EPOLLIN | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR)
     __epoll_rw = __epoll_ro | select.EPOLLOUT
 
-    def __init__(self, port, baud = 115200, sock):
+    def __init__(self, port, sock, baud = 115200):
         self.port              = port
         self.baud              = baud
         self.port_name         = self.port.split('/')[-1]
