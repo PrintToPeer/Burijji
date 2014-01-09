@@ -56,7 +56,7 @@ class repWrapper(BurijjiMachine):
 
     def _parse_line(self, line):
         temp_matches = self._temp_exp.findall(line)
-        temps   = dict((m[0].lower(), float(m[1])) for m in temp_matches)
+        temps        = dict((m[0].lower(), float(m[1])) for m in temp_matches)
         self._mutex.acquire()
         self._temperatures.update(temps)
         self._mutex.release()
