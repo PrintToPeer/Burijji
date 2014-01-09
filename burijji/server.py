@@ -5,11 +5,10 @@ from time        import time
 from time        import sleep
 
 class BurijjiServer():
-    __tmp_dir  = '/tmp/PrintToPeer'
     __epoll_ro = (select.EPOLLIN | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR)
     __epoll_rw = __epoll_ro | select.EPOLLOUT
 
-    def __init__(self, port, baud = 115200):
+    def __init__(self, port, baud = 115200, sock):
         self.port              = port
         self.baud              = baud
         self.port_name         = self.port.split('/')[-1]
@@ -21,7 +20,7 @@ class BurijjiServer():
         self.pid               = vid_pid.split(':')[1]
 
         self.running           = True
-        self.__sock            = self.__tmp_dir+'/socks/'+self.port_name+'.sock'
+        self.__sock            = sock
         self.__epoll           = select.epoll()
         self.__socketserver    = None
         self.__outbound_queues = {}
@@ -37,9 +36,6 @@ class BurijjiServer():
         else:
             from repWrapper import repWrapper
             self.__machine = repWrapper(self)
-
-        if not os.path.exists(self.__tmp_dir): os.makedirs(self.__tmp_dir)
-        if not os.path.exists(self.__tmp_dir+'/socks'): os.makedirs(self.__tmp_dir+'/socks')
 
     def start(self):
         threading.Thread(target=self.__run).start()
