@@ -59,11 +59,20 @@ class BurijjiServer():
         while self.running:
             sleep(0.01)
             events = self.__epoll.poll(0.01)
-            for fileno, event in events: 
-                if fileno == self.__socketserver.fileno():        self.__setup_connection(self.__socketserver.accept()[0])
-                elif event & select.EPOLLOUT:                     self.__send(fileno)
-                elif event & (select.EPOLLIN  | select.EPOLLPRI): self.__recv(fileno)
-                elif event & (select.EPOLLHUP | select.EPOLLERR): self.__teardown_connection(fileno)
+            for fileno, event in events:
+                if fileno == self.__socketserver.fileno():                 self.__setup_connection(self.__socketserver.accept()[0])
+                elif event == select.EPOLLOUT:                             self.__send(fileno)
+                elif event == select.EPOLLIN  or event == select.EPOLLPRI: self.__recv(fileno)
+                elif event == (select.EPOLLIN | select.EPOLLOUT):
+                    self.__recv(fileno)
+                    self.__send(fileno)
+                elif event == (select.EPOLLIN | select.EPOLLHUP):
+                    self.__recv(fileno)
+                    self.__teardown_connection(fileno)
+                elif event == (select.EPOLLIN | select.EPOLLOUT | select.EPOLLHUP):
+                    self.__recv(fileno)
+                    self.__teardown_connection(fileno)
+                elif event == select.EPOLLHUP or event == select.EPOLLERR: self.__teardown_connection(fileno)
 
         self.__teardown_server()
 
@@ -94,13 +103,15 @@ class BurijjiServer():
         self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.2.0', 'pid': os.getpid()}})
 
     def __teardown_connection(self, fileno):
-        self.__epoll.unregister(fileno)
-        self.__connections[fileno].close()
-        if self.running:
-            self.__machine.unsubscribe(fileno, {'type': 'all'})
-            del self.__connections[fileno]
-            del self.__unpackers[fileno]
-            del self.__outbound_queues[fileno]
+        try:
+            self.__epoll.unregister(fileno)
+            self.__connections[fileno].close()
+            if self.running:
+                self.__machine.unsubscribe(fileno, {'type': 'all'})
+                del self.__connections[fileno]
+                del self.__unpackers[fileno]
+                del self.__outbound_queues[fileno]
+        except: pass
 
     def __send(self, fileno):
         self.__mutex.acquire()
