@@ -58,9 +58,10 @@ class BurijjiServer():
 
         while self.running:
             sleep(0.01)
-            events = self.__epoll.poll(0.01)
+            events = self.__epoll.poll(0)
             for fileno, event in events:
-                if fileno == self.__socketserver.fileno():                 self.__setup_connection(self.__socketserver.accept()[0])
+                if fileno == self.__socketserver.fileno():
+                    if event == select.EPOLLIN:                            self.__setup_connection(self.__socketserver.accept()[0])
                 elif event == select.EPOLLOUT:                             self.__send(fileno)
                 elif event == select.EPOLLIN  or event == select.EPOLLPRI: self.__recv(fileno)
                 elif event == (select.EPOLLIN | select.EPOLLOUT):
