@@ -38,7 +38,7 @@ class repWrapper(BurijjiMachine):
             self.__printer.send_now(command)
 
     def _print_file(self, data):
-        gcoder.GCode([i.strip() for i in open(data)])
+        gcode = gcoder.GCode([i.strip() for i in open(data)])
         self.__printer.startprint(gcode)
 
     def _end_print(self):
