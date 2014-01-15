@@ -96,6 +96,7 @@ class BurijjiMachine(object):
         else:
             self._temp_subscribers.append(fileno)
             self._info_subscribers.append(fileno)
+            self._raw_subscribers.append(fileno)
         self._mutex.release()
 
     def unsubscribe(self, fileno, data):
