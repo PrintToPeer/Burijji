@@ -76,6 +76,7 @@ class mbWrapper(BurijjiMachine):
             self._current_line = None
             self._print_data   = None
             if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
+            self.print_complete()
 
     def _stop_print(self):
         self._printing = False

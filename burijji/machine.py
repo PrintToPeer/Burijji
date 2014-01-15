@@ -17,6 +17,7 @@ class BurijjiMachine(object):
         self._routines         = {}
         self._port_info        = {'vid': self._server.vid, 'pid': self._server.pid, 'iserial': self._server.iserial}
         self._raw_output       = deque()
+        self._other_messages   = deque()
 
     def start(self):
         threading.Thread(target=self._update).start()
@@ -36,11 +37,16 @@ class BurijjiMachine(object):
             info_subscribers = self._info_subscribers
             raw_subscribers  = self._raw_subscribers
             raw_output       = list(self._raw_output)
+            other_messages   = list(self._other_messages)
             self._raw_output.clear()
+            self._other_messages.clear()
             self._mutex.release()
 
             for fileno in temp_subscribers: self._server.add_to_queue(fileno, temp_msg)
-            for fileno in info_subscribers: self._server.add_to_queue(fileno, info_msg)
+            for fileno in info_subscribers:
+                self._server.add_to_queue(fileno, info_msg)
+                for message in other_messages:
+                    self._server.add_to_queue(fileno, message)
             for fileno in raw_subscribers:
                 for line in raw_output:
                     self._server.add_to_queue(fileno, {'action': 'raw', 'data': line})
@@ -59,19 +65,26 @@ class BurijjiMachine(object):
         if fileno not in self._info_subscribers: self._info_subscribers.append(fileno)
         self._mutex.release()
 
+        self.add_other_message({'action': 'print_started', 'data': ''})
         if 'start_print' in self._routines: self._send_commands(self._routines['start_print'])
         self._print_file(data)
 
     def stop_print(self, fileno, data):
         self._stop_print()
+        self.add_other_message({'action': 'print_stoped', 'data': ''})
 
     def pause_print(self, fileno, data):
         if self._printing:
             self._pause_print()
             if 'pause' in self._routines: self._send_commands(self._routines['pause_print'])
+            self.add_other_message({'action': 'print_paused', 'data': ''})
+
+    def print_complete(self):
+        self.add_other_message({'action': 'print_complete', 'data': ''})
 
     def resume_print(self, fileno, data):
         if self._paused:
+            self.add_other_message({'action': 'print_resumed', 'data': ''})
             if 'resume' in self._routines: self._send_commands(self._routines['resume_print'])
             self._resume_print()
 
@@ -87,6 +100,11 @@ class BurijjiMachine(object):
             self._routines.update(data)
         else:
             self.bad_data_sent(fileno)
+
+    def add_other_message(self, message):
+        self._mutex.acquire()
+        self._other_messages.append(message)
+        self._mutex.release()
 
     def subscribe(self, fileno, data):
         subscription = data['type']
