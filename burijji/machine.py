@@ -112,13 +112,17 @@ class BurijjiMachine(object):
             return(self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Invalid subscription type.'}))
 
         self._mutex.acquire()
-        if subscription is 'temperature':
+        if subscription == 'temperature':
+            print(subscription)
             self._temp_subscribers.append(fileno)
-        elif subscription is 'info':
+        elif subscription == 'info':
+            print(subscription)
             self._info_subscribers.append(fileno)
-        elif subscription is 'raw':
+        elif subscription == 'raw':
+            print(subscription)
             self._raw_subscribers.append(fileno)
-        else:
+        elif subscription == 'all':
+            print(subscription)
             self._temp_subscribers.append(fileno)
             self._info_subscribers.append(fileno)
             self._raw_subscribers.append(fileno)
@@ -130,14 +134,19 @@ class BurijjiMachine(object):
             return(self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Invalid subscription type.'}))
 
         self._mutex.acquire()
-        if subscription is 'temperature':
+        if subscription == 'temperature':
             try:
                 self._temp_subscribers.remove(fileno)
             except:
                 pass
-        elif subscription is 'info':
+        elif subscription == 'info':
             try:
                 self._info_subscribers.remove(fileno)
+            except:
+                pa
+        elif subscription == 'raw':
+            try:
+                self._raw_subscribers.remove(fileno)
             except:
                 pass
         else:
@@ -147,6 +156,10 @@ class BurijjiMachine(object):
                 pass
             try:
                 self._info_subscribers.remove(fileno)
+            except:
+                pass
+            try:
+                self._raw_subscribers.remove(fileno)
             except:
                 pass
         self._mutex.release()
