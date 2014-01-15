@@ -56,7 +56,7 @@ class repWrapper(BurijjiMachine):
 
     def _parse_line(self, line):
         self._mutex.acquire()
-        for fileno in self._raw_subscribers: self._server.add_to_queue(fileno, {'action': 'raw', 'data': line})
+        self._raw_output.append(line)
         self._mutex.release()
 
         temp_matches = self._temp_exp.findall(line)

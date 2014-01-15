@@ -16,6 +16,7 @@ class BurijjiMachine(object):
         self._machine_info     = {}
         self._routines         = {}
         self._port_info        = {'vid': self._server.vid, 'pid': self._server.pid, 'iserial': self._server.iserial}
+        self._raw_output       = deque()
 
     def start(self):
         threading.Thread(target=self._update).start()
@@ -33,10 +34,16 @@ class BurijjiMachine(object):
             info_msg         = {'action': 'info', 'data': {'current_line': self._current_line, 'printing': self._printing, 'paused': self._paused, 'port_info': self._port_info, 'machine_info': self._machine_info}}
             temp_subscribers = self._temp_subscribers
             info_subscribers = self._info_subscribers
+            raw_subscribers  = self._raw_subscribers
+            raw_output       = list(self._raw_output)
+            self._raw_output.clear()
             self._mutex.release()
 
             for fileno in temp_subscribers: self._server.add_to_queue(fileno, temp_msg)
             for fileno in info_subscribers: self._server.add_to_queue(fileno, info_msg)
+            for fileno in raw_subscribers:
+                for line in raw_output:
+                    self._server.add_to_queue(fileno, {'action': 'raw', 'data': line})
 
     def machine_info(self):
         self._server.add_to_queue(fileno, {'action': 'machine_info', 'data': self._machine_info})
@@ -83,7 +90,7 @@ class BurijjiMachine(object):
 
     def subscribe(self, fileno, data):
         subscription = data['type']
-        if subscription not in ['temperature','info','all']:
+        if subscription not in ['temperature','info','raw','all']:
             return(self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Invalid subscription type.'}))
 
         self._mutex.acquire()
@@ -101,7 +108,7 @@ class BurijjiMachine(object):
 
     def unsubscribe(self, fileno, data):
         subscription = data['type']
-        if subscription not in ['temperature','info','all']:
+        if subscription not in ['temperature','info','raw','all']:
             return(self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Invalid subscription type.'}))
 
         self._mutex.acquire()
