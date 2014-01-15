@@ -101,7 +101,7 @@ class BurijjiServer():
         self.__connections[fileno]     = connection
         self.__unpackers[fileno]       = msgpack.Unpacker()
         self.__outbound_queues[fileno] = deque()
-        self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.2.0', 'pid': os.getpid()}})
+        self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.3.0', 'pid': os.getpid()}})
 
     def __teardown_connection(self, fileno):
         try:

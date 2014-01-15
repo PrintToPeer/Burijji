@@ -1,5 +1,6 @@
 import threading
 from time import sleep
+from collections import deque
 
 class BurijjiMachine(object):
     def __init__(self, server):
@@ -7,6 +8,7 @@ class BurijjiMachine(object):
         self._mutex            = threading.Lock()
         self._temp_subscribers = []
         self._info_subscribers = []
+        self._raw_subscribers  = []
         self._temperatures     = {}
         self._current_line     = None
         self._printing         = False
@@ -89,6 +91,8 @@ class BurijjiMachine(object):
             self._temp_subscribers.append(fileno)
         elif subscription is 'info':
             self._info_subscribers.append(fileno)
+        elif subscription is 'raw':
+            self._raw_subscribers.append(fileno)
         else:
             self._temp_subscribers.append(fileno)
             self._info_subscribers.append(fileno)
