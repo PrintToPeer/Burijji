@@ -113,16 +113,12 @@ class BurijjiMachine(object):
 
         self._mutex.acquire()
         if subscription == 'temperature':
-            print(subscription)
             self._temp_subscribers.append(fileno)
         elif subscription == 'info':
-            print(subscription)
             self._info_subscribers.append(fileno)
         elif subscription == 'raw':
-            print(subscription)
             self._raw_subscribers.append(fileno)
         elif subscription == 'all':
-            print(subscription)
             self._temp_subscribers.append(fileno)
             self._info_subscribers.append(fileno)
             self._raw_subscribers.append(fileno)
