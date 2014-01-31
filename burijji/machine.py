@@ -15,7 +15,6 @@ class BurijjiMachine(object):
         self._paused           = False
         self._machine_info     = {}
         self._routines         = {}
-        self._port_info        = {'vid': self._server.vid, 'pid': self._server.pid, 'iserial': self._server.iserial}
         self._raw_output       = deque()
         self._other_messages   = deque()
 
@@ -32,7 +31,7 @@ class BurijjiMachine(object):
 
             self._mutex.acquire()
             temp_msg         = {'action': 'temperature', 'data': self._temperatures}
-            info_msg         = {'action': 'info', 'data': {'current_line': self._current_line, 'printing': self._printing, 'paused': self._paused, 'port_info': self._port_info, 'machine_info': self._machine_info}}
+            info_msg         = {'action': 'info', 'data': {'current_line': self._current_line, 'printing': self._printing, 'paused': self._paused, 'machine_info': self._machine_info}}
             temp_subscribers = self._temp_subscribers
             info_subscribers = self._info_subscribers
             raw_subscribers  = self._raw_subscribers

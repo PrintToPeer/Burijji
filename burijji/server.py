@@ -13,12 +13,6 @@ class BurijjiServer():
         self.baud              = baud
         self.port_name         = self.port.split('/')[-1]
 
-        hw_info                = lp.hwinfo(self.port)
-        vid_pid                = hw_info.split('PID=')[1].split()[0]
-        self.iserial           = hw_info.split('SNR=')[1]
-        self.vid               = vid_pid.split(':')[0]
-        self.pid               = vid_pid.split(':')[1]
-
         self.running           = True
         self.__sock            = sock
         self.__epoll           = select.epoll()
@@ -30,12 +24,8 @@ class BurijjiServer():
         self._operations       = ['machine_info', 'send_commands', 'print_file', 'pause_print', 'resume_print']
         self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe', 'stop_print']
 
-        if self.vid == '23c1':
-            from mbWrapper import mbWrapper
-            self.__machine = mbWrapper(self)
-        else:
-            from repWrapper import repWrapper
-            self.__machine = repWrapper(self)
+        from repWrapper import repWrapper
+        self.__machine = repWrapper(self)
 
     def start(self):
         threading.Thread(target=self.__run).start()
