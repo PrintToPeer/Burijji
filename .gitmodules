@@ -1,9 +1,3 @@
-[submodule "s3g"]
-	path = s3g
-	url = https://github.com/makerbot/s3g
-[submodule "mb_serial"]
-	path = mb_serial
-	url = https://github.com/makerbot/pyserial
 [submodule "Printrun"]
 	path = Printrun
 	url = https://github.com/kliment/Printrun
