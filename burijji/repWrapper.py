@@ -197,24 +197,28 @@ class repWrapper:
         if self._current_segment == 'none':
             self._current_segment = 'starting'
             if 'start_print' in self._routines:
-                self.__printer.startprint(gcoder.GCode(self._routines['start_print']))
+                threading.Thread(target=self._delayed_start, args=[self._routines['start_print']]).start()
             else:
                 self._advance_segment()
 
         elif self._current_segment == 'starting':
             self._current_segment = 'printing'
-            self.__printer.startprint(gcoder.GCode([i.strip() for i in open(self._gcode_file)]))
+            threading.Thread(target=self._delayed_start, args=[[i.strip() for i in open(self._gcode_file)]]).start()
 
         elif self._current_segment == 'printing':
             self._current_segment = 'ending'
             if 'end_print' in self._routines:
-                self.__printer.startprint(gcoder.GCode(self._routines['end_print']))
+                threading.Thread(target=self._delayed_start, args=[self._routines['end_print']]).start()
             else:
                 self._advance_segment()
 
         elif self._current_segment == 'ending':
             self.print_complete()
             self._current_segment = 'none'
+
+    def _delayed_start(self, data):
+        sleep(0.1)
+        self.__printer.startprint(gcoder.GCode(data))
 
     def _end_print(self):
         if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
