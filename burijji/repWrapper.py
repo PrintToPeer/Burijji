@@ -204,6 +204,7 @@ class repWrapper:
         elif self._current_segment == 'starting':
             self._current_segment = 'printing'
             threading.Thread(target=self._delayed_start, args=[[i.strip() for i in open(self._gcode_file)]]).start()
+            self.add_other_message({'action': 'segment_completed', 'data': 'start_segment'})
 
         elif self._current_segment == 'printing':
             self._current_segment = 'ending'
@@ -211,10 +212,12 @@ class repWrapper:
                 threading.Thread(target=self._delayed_start, args=[self._routines['end_print']]).start()
             else:
                 self._advance_segment()
+            self.add_other_message({'action': 'segment_completed', 'data': 'print_segment'})
 
         elif self._current_segment == 'ending':
             self.print_complete()
             self._current_segment = 'none'
+            self.add_other_message({'action': 'segment_completed', 'data': 'end_segment'})
 
     def _delayed_start(self, data):
         sleep(0.1)
