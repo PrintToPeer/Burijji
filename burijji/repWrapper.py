@@ -95,8 +95,8 @@ class repWrapper:
         self._gcode_file = data
         self._advance_segment()
 
-    def cancel_print(self, fileno, data):
-        self._cancel_print()
+    def stop_print(self, fileno, data):
+        self._stop_print()
         self.add_other_message({'action': 'print_cancelled', 'data': ''})
 
     def pause_print(self, fileno, data):
@@ -227,7 +227,7 @@ class repWrapper:
         if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
         self.print_complete()
 
-    def _cancel_print(self):
+    def _stop_print(self):
         self.__printer.pause()
         self._end_print()
 
