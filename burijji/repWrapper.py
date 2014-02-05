@@ -191,7 +191,7 @@ class repWrapper:
 
     def _send_commands(self, commands):
         for command in commands:
-            self.__printer.send(command)
+            self.__printer.send_now(command)
 
     def _advance_segment(self):
         if self._current_segment == 'none':
