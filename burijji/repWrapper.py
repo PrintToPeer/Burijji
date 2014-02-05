@@ -97,7 +97,7 @@ class repWrapper:
 
     def stop_print(self, fileno, data):
         self._stop_print()
-        self.add_other_message({'action': 'print_cancelled', 'data': ''})
+        self.add_other_message({'action': 'print_stopped', 'data': ''})
 
     def pause_print(self, fileno, data):
         if self._printing:
