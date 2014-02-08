@@ -1,8 +1,8 @@
 import os, sys, socket, select, threading, msgpack, serial
-import serial.tools.list_ports as lp
 from collections import deque
 from time        import time
 from time        import sleep
+from repWrapper  import repWrapper
 
 class BurijjiServer():
     __epoll_ro = (select.EPOLLIN | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR)
@@ -24,7 +24,6 @@ class BurijjiServer():
         self._operations       = ['machine_info', 'send_commands', 'print_file', 'pause_print', 'resume_print']
         self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe', 'stop_print']
 
-        from repWrapper import repWrapper
         self.__machine = repWrapper(self)
 
     def start(self):
@@ -91,7 +90,7 @@ class BurijjiServer():
         self.__connections[fileno]     = connection
         self.__unpackers[fileno]       = msgpack.Unpacker()
         self.__outbound_queues[fileno] = deque()
-        self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.5.0', 'pid': os.getpid()}})
+        self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.7.0', 'pid': os.getpid()}})
 
     def __teardown_connection(self, fileno):
         try:
