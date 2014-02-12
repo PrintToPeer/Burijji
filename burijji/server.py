@@ -88,7 +88,7 @@ class BurijjiServer():
         fileno = connection.fileno()
         self.__epoll.register(fileno, self.__epoll_ro)
         self.__connections[fileno]     = connection
-        self.__unpackers[fileno]       = msgpack.Unpacker()
+        self.__unpackers[fileno]       = msgpack.Unpacker(use_list=True)
         self.__outbound_queues[fileno] = deque()
         self.add_to_queue(fileno,{'action': 'server_info', 'data': {'version': '0.7.0', 'pid': os.getpid()}})
 
