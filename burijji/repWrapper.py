@@ -19,6 +19,7 @@ class repWrapper:
         self._current_line     = None
         self._printing         = False
         self._paused           = False
+        self._ok               = True
         self._machine_info     = {}
         self._routines         = {}
         self._raw_output       = deque()
@@ -42,11 +43,16 @@ class repWrapper:
             temp_subscribers = self._temp_subscribers
             info_subscribers = self._info_subscribers
             raw_subscribers  = self._raw_subscribers
+            ok               = self._ok
             raw_output       = list(self._raw_output)
             other_messages   = list(self._other_messages)
             self._raw_output.clear()
             self._other_messages.clear()
             self._mutex.release()
+
+            if not self._ok:
+              print "burijji: disconnected"
+              other_messages.append({'action': 'disconnected'})
 
             for fileno in temp_subscribers: self._server.add_to_queue(fileno, temp_msg)
             for fileno in info_subscribers:
@@ -56,6 +62,9 @@ class repWrapper:
             for fileno in raw_subscribers:
                 for line in raw_output:
                     self._server.add_to_queue(fileno, {'action': 'raw', 'data': line})
+
+            if not self._ok:
+              self._server.stop()
 
     def _update(self):
         printer        = self.__printer
@@ -73,6 +82,7 @@ class repWrapper:
             self._current_line = printer.queueindex
             self._printing     = printer.printing
             self._paused       = printer.paused
+            self._ok           = (printer.writefailures < 10)
             self._mutex.release()
 
         self.__printer.disconnect()
@@ -221,6 +231,7 @@ class repWrapper:
 
     def _delayed_start(self, data):
         sleep(0.1)
+        self.__printer.endcb  = self._advance_segment
         self.__printer.startprint(gcoder.GCode(data))
 
     def _end_print(self):
@@ -228,6 +239,7 @@ class repWrapper:
         self.print_complete()
 
     def _stop_print(self):
+        self.__printer.endcb = None
         self.__printer.pause()
         self._end_print()
 
