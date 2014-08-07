@@ -1,5 +1,4 @@
 #!/bin/bash
 
-cd /home/pi/PrintToPi/Burijji/GPX
-make
-./gpx $*
+/home/pi/Burijji/GPX/gpx -i -s -r -v $*
+

@@ -43,7 +43,7 @@
 #define REPLY(FN) if(gpx->flag.interactive) {FN;}
 #define SHOW(FN) if(gpx->flag.logMessages) {FN;}
 #define VERBOSE(FN) if(gpx->flag.verboseMode && gpx->flag.logMessages) {FN;}
-#define CALL(FN) if((rval = FN) != SUCCESS) return rval
+#define CALL(FN) { rval = FN; if(rval != SUCCESS) { printf("gpx.c:%d: %s returned %d\n", __LINE__, #FN, rval); return rval; } }
 
 // Machine definitions
 
@@ -332,6 +332,22 @@ int gpx_set_machine(Gpx *gpx, char *machine)
     // update known position mask
     gpx->axis.mask = gpx->machine.extruder_count == 1 ? (XYZ_BIT_MASK | A_IS_SET) : AXES_BIT_MASK;;
     return SUCCESS;
+}
+
+
+// CUSTOM FUNCTIONS
+int read_all(int handle, void* buffer, int nbytes)
+{
+  int total_bytes_read = 0;
+  while (total_bytes_read < nbytes)
+  {
+    int result = read(handle, buffer + total_bytes_read, nbytes - total_bytes_read);
+    if (result <= 0) return result;
+
+    total_bytes_read += result;
+  }
+
+  return total_bytes_read;
 }
 
 // PRIVATE FUNCTION PROTOTYPES
@@ -3798,6 +3814,15 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
                 gpx->excess.a = 0;
                 gpx->excess.b = 0;
+
+                // Load home positions from EEPROM
+                CALL( recall_home_positions(gpx) );
+                command_emitted++;
+                // clear loaded axes
+                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
+                gpx->excess.a = 0;
+                gpx->excess.b = 0;
+
                 break;
             }
 
@@ -4218,12 +4243,19 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 }
                 break;
                 
-                // M105 - Get extruder temperature
+                // M105 - Get temperatures
             case 105:
                 CALL( get_extruder_temperature(gpx, 0) );
+                CALL( get_build_platform_temperature(gpx, 0) );
                 command_emitted++;
                 break;
                 
+                // M115 - Get firmware version
+            case 115:
+                CALL( get_advanced_version_number(gpx) );
+                command_emitted++;
+                break;
+
                 // M106 - Turn cooling fan on
             case 106: {
                 int state = (gpx->command.flag & S_IS_SET) ? ((unsigned)gpx->command.s ? 1 : 0) : 1;
@@ -4916,7 +4948,6 @@ static void read_extruder_query_response(Gpx *gpx, Sio *sio, unsigned command, c
             VERBOSE( fprintf(gpx->log, "Extruder T%u temperature: %uc" EOL,
                         extruder_id,
                         sio->response.temperature) );
-            REPLY( printf("ok T:%u\n", sio->response.temperature) );
             break;
     
             // Query 22 - Is extruder ready
@@ -4932,7 +4963,7 @@ static void read_extruder_query_response(Gpx *gpx, Sio *sio, unsigned command, c
         case 30:
             // int16: Current temperature, in Celsius
             sio->response.temperature = read_16(gpx);
-            VERBOSE( fprintf(gpx->log, "Build platform T%u temperature: %uc" EOL,
+            VERBOSE( fprintf(gpx->log, "Build platform B%u temperature: %uc" EOL,
                         extruder_id,
                         sio->response.temperature) );
             break;
@@ -5205,19 +5236,22 @@ static void read_query_response(Gpx *gpx, Sio *sio, unsigned command, char *buff
 
             // uint16_t Reserved for future use
             read_16(gpx);
+
+            char *varient = "Unknown";
+            switch(sio->response.firmware.variant) {
+                case 0x01:
+                    varient = "Makerbot";
+                    break;
+                case 0x80:
+                    varient = "Sailfish";
+                    break;
+            }
             
             if(gpx->flag.verboseMode && gpx->flag.logMessages) {
-                char *varient = "Unknown";
-                switch(sio->response.firmware.variant) {
-                    case 0x01:
-                        varient = "Makerbot";
-                        break;
-                    case 0x80:
-                        varient = "Sailfish";
-                        break;
-                }
                 fprintf(gpx->log, "%s firmware v%u.%u" EOL, varient, sio->response.firmware.version / 100, sio->response.firmware.version % 100);
             }
+
+            REPLY(printf("ok: firmware is %s v%u.%u\n", varient, sio->response.firmware.version / 100, sio->response.firmware.version % 100));
             break;
     }
 }
@@ -5249,10 +5283,11 @@ static int port_handler(Gpx *gpx, Sio *sio, char *buffer, size_t length)
             
             if(sio->bytes_in) {
                 // recieve the response
-                if((bytes = read(sio->port, gpx->buffer.in, 2)) == -1) {
+                if((bytes = read_all(sio->port, gpx->buffer.in, 2)) == -1) {
                     return errno;
                 }
                 else if(bytes != 2) {
+                    printf("gpx.c:%d: Read %d bytes (expected 2)\n", __LINE__, bytes);
                     return ESIOREAD;
                 }
                 // invalid start byte
@@ -5265,29 +5300,32 @@ static int port_handler(Gpx *gpx, Sio *sio, char *buffer, size_t length)
                 // first read
                 for(;;) {
                     // read start byte
-                    if((bytes = read(sio->port, gpx->buffer.in, 1)) == -1) {
+                    if((bytes = read_all(sio->port, gpx->buffer.in, 1)) == -1) {
                         return errno;
                     }
                     else if(bytes != 1) {
+                        printf("gpx.c:%d: Read %d bytes (expected 1)\n", __LINE__, bytes);
                         return ESIOREAD;
                     }
                     // loop until we get a valid start byte
                     if(gpx->buffer.in[0] == 0xD5) break;
                 }
                 // read length
-                if((bytes = read(sio->port, gpx->buffer.in + 1, 1)) == -1) {
+                if((bytes = read_all(sio->port, gpx->buffer.in + 1, 1)) == -1) {
                     return errno;
                 }
                 else if(bytes != 1) {
+                    printf("gpx.c:%d: Read %d bytes (expected 1)\n", __LINE__, bytes);
                     return ESIOREAD;                    
                 }
             }
             size_t payload_length = gpx->buffer.in[1];
             // recieve payload
-            if((bytes = read(sio->port, gpx->buffer.in + 2, payload_length + 1)) == -1) {
+            if((bytes = read_all(sio->port, gpx->buffer.in + 2, payload_length + 1)) == -1) {
                 return errno;
             }
             else if(bytes != payload_length + 1) {
+                printf("gpx.c:%d: Read %d bytes (expected %d)\n", __LINE__, bytes, payload_length + 1);
                 return ESIOREAD;                
             }
             // check CRC
@@ -5372,8 +5410,8 @@ static int port_handler(Gpx *gpx, Sio *sio, char *buffer, size_t length)
                     break;
             }
 L_RETRY:
-            // wait for 2 seconds
-            sleep(2);
+            // wait for 1/10 second
+            usleep(100000);
         } while(++retry_count < 5);
     }
 
@@ -5429,6 +5467,7 @@ int gpx_convert_and_send(Gpx *gpx, FILE *file_in, int sio_port)
             }
             
             rval = gpx_convert_line(gpx, gpx->buffer.in);
+            SHOW( fprintf(gpx->log, "ok" EOL) );
             // normal exit
             if(rval > 0) break;
             // error

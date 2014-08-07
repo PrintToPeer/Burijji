@@ -3,14 +3,16 @@ from collections import deque
 from time        import time
 from time        import sleep
 from repWrapper  import repWrapper
+from mbWrapper  import mbWrapper
 
 class BurijjiServer():
     __epoll_ro = (select.EPOLLIN | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR)
     __epoll_rw = __epoll_ro | select.EPOLLOUT
 
-    def __init__(self, port, sock, baud = 115200):
+    def __init__(self, port, sock, baud, protocol):
         self.port              = port
         self.baud              = baud
+        self.protocol          = protocol
         self.port_name         = self.port.split('/')[-1]
 
         self.running           = True
@@ -24,7 +26,12 @@ class BurijjiServer():
         self._operations       = ['machine_info', 'send_commands', 'print_file', 'pause_print', 'resume_print']
         self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe', 'stop_print']
 
-        self.__machine = repWrapper(self)
+        print "BurijjiServer Initialized"
+        print "Creating machine with protocol '" + str(self.protocol) + "'"
+        if self.protocol == "x3g":
+          self.__machine = mbWrapper(self)
+        else:
+          self.__machine = repWrapper(self)
 
     def start(self):
         threading.Thread(target=self.__run).start()

@@ -584,6 +584,7 @@ int main(int argc, char * argv[])
             gpx_start_convert(&gpx, buildname);
             rval = gpx_convert_and_send(&gpx, file_in, sio_port);
             gpx_end_convert(&gpx);
+            printf("Done (%d)\n", rval);
         }
     }
     else {        
@@ -592,6 +593,7 @@ int main(int argc, char * argv[])
         gpx_start_convert(&gpx, buildname);
         rval = gpx_convert(&gpx, file_in, file_out, file_out2);
         gpx_end_convert(&gpx);
+        printf("Done (%d)\n", rval);
     }
     exit(rval);
 }
