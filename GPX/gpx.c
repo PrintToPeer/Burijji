@@ -4376,11 +4376,22 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                             CALL( set_nozzle_temperature(gpx, gpx->target.extruder, temperature) );
                             gpx->tool[gpx->target.extruder].nozzle_temperature = temperature;
                             // wait for extruder to reach (or exceed) temperature
+                            gpx->tool[gpx->target.extruder].is_ready = 0;
                             if(gpx->tool[gpx->target.extruder].nozzle_temperature > 0) {
-                                CALL( wait_for_extruder(gpx, gpx->target.extruder, timeout) );
-                                if(gpx->flag.verboseMode) {
-                                    CALL( display_tag(gpx) );
+
+                                // Loop until extruder has heated
+                                while (!gpx->tool[gpx->target.extruder].is_ready)
+                                {
+                                  CALL( get_extruder_status(gpx, gpx->target.extruder) );
+                                  CALL( get_extruder_temperature(gpx, gpx->target.extruder) );
+
+                                  usleep(1000 * 1000); // 100ms
                                 }
+
+                                CALL( wait_for_extruder(gpx, gpx->target.extruder, timeout) );
+                                // if(gpx->flag.verboseMode) {
+                                //    CALL( display_tag(gpx) );
+                                // }
                             }
                             command_emitted++;
                         }
@@ -4529,9 +4540,22 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                     if(gpx->command.flag & T_IS_SET) {
                         tool_id = gpx->target.extruder;
                     }
+
+                    gpx->tool[tool_id].bed_is_ready = 0;
                     if(tool_id ? gpx->machine.b.has_heated_build_platform : gpx->machine.a.has_heated_build_platform
                        && gpx->tool[tool_id].build_platform_temperature > 0) {
-                        CALL( wait_for_build_platform(gpx, tool_id, timeout) );
+
+                      // Loop until bed has heated
+                      while (!gpx->tool[tool_id].bed_is_ready)
+                      {
+                        CALL( is_build_platform_ready(gpx, tool_id) );
+                        CALL( get_build_platform_temperature(gpx, tool_id) );
+
+                        usleep(1000 * 1000); // 100ms
+                      }
+
+                      CALL( wait_for_build_platform(gpx, gpx->target.extruder, timeout) );
+
                         command_emitted++;
                     }
                     else {
@@ -4993,6 +5017,8 @@ static void read_extruder_query_response(Gpx *gpx, Sio *sio, unsigned command, c
             VERBOSE( fprintf(gpx->log, "Build platform T%u is%sready" EOL,
                         extruder_id,
                         sio->response.isReady ? " " : " not ") );
+            
+            gpx->tool[extruder_id].bed_is_ready = sio->response.isReady;
             break;
     
             // Query 36 - Get extruder status
@@ -5008,6 +5034,8 @@ static void read_extruder_query_response(Gpx *gpx, Sio *sio, unsigned command, c
                 if(sio->response.extruder.flag.temperatureDropping) fputs("Heater temperature dropped below target temperature" EOL, gpx->log);
                 if(sio->response.extruder.flag.buildPlateError) fputs("An error was detected with the build plate heater or sensor" EOL, gpx->log);
                 if(sio->response.extruder.flag.extruderError) fputs("An error was detected with the extruder heater or sensor" EOL, gpx->log);
+
+                gpx->tool[extruder_id].is_ready = sio->response.extruder.flag.ready;
             }
             break;
     

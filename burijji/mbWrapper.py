@@ -9,7 +9,7 @@ class mbWrapper:
     _temp_exp = re.compile("([TB]\d*) temperature: ([-+]?\d*\.?\d*)c")
     _uuid_exp = re.compile("UUID:([0-F]{8}-[0-F]{4}-4[0-F]{3}-[89AB][0-F]{3}-[0-F]{12})", re.I)
 
-    def __init__(self, server):
+    def __init__(self, server, protocol):
         self._server           = server
         self._mutex            = threading.Lock()
         self._temp_subscribers = []
@@ -27,7 +27,7 @@ class mbWrapper:
         self._machine_info     = {'type': 'MakerBot', 'model':  'Unknown', 'uuid': None}
         self._current_segment  = 'none'
         self._gcode_file       = None
-        self.__printer = X3GPrinter(baud=self._server.baud, port=self._server.port)
+        self.__printer = X3GPrinter(baud=self._server.baud, port=self._server.port, settings=protocol['x3g_settings'])
 
     def start(self):
         threading.Thread(target=self._update).start()
@@ -78,6 +78,10 @@ class mbWrapper:
             sleep(1)
             printer.send_now('M105')
 
+            self._current_line = printer.queueindex
+            self._printing     = printer.printing
+            self._paused       = False
+
             if printer.ok == False:
               self._ok = False
 
@@ -112,6 +116,7 @@ class mbWrapper:
             self.add_other_message({'action': 'print_paused', 'data': ''})
 
     def print_complete(self):
+        self.__printer.on_complete = None
         self.add_other_message({'action': 'print_complete', 'data': ''})
 
     def resume_print(self, fileno, data):
@@ -255,8 +260,6 @@ class mbWrapper:
         self._mutex.acquire()
         self._temperatures.update(temps)
         self._mutex.release()
-
-        print "MBWrapper Temperatures:", temps
 
         if 'FIRMWARE' in line:
             firmware_name  = line.split('FIRMWARE_NAME:')[1].split(';')[0]

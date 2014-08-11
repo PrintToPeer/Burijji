@@ -204,6 +204,8 @@ extern "C" {
 #endif
         unsigned nozzle_temperature;
         unsigned build_platform_temperature;
+        unsigned is_ready;
+        unsigned bed_is_ready;
     } Tool;
     
     typedef struct tOverride {

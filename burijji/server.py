@@ -27,9 +27,9 @@ class BurijjiServer():
         self._operations      += ['run_routine', 'update_routines', 'subscribe', 'unsubscribe', 'stop_print']
 
         print "BurijjiServer Initialized"
-        print "Creating machine with protocol '" + str(self.protocol) + "'"
-        if self.protocol == "x3g":
-          self.__machine = mbWrapper(self)
+        print "Creating machine with protocol '" + str(self.protocol["protocol"]) + "'"
+        if self.protocol["protocol"] == "x3g":
+          self.__machine = mbWrapper(self, protocol)
         else:
           self.__machine = repWrapper(self)
 
