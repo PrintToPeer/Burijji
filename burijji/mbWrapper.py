@@ -73,6 +73,7 @@ class mbWrapper:
         sleep(3)
 
         printer.send_now('M115')
+        printer.send_now('M114')
 
         while self._server.running:
             sleep(1)
@@ -117,6 +118,7 @@ class mbWrapper:
 
     def print_complete(self):
         self.__printer.on_complete = None
+        self._current_segment  = 'none'
         self.add_other_message({'action': 'print_complete', 'data': ''})
 
     def resume_print(self, fileno, data):
@@ -201,8 +203,7 @@ class mbWrapper:
         self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Malformed data.'})
 
     def _send_commands(self, commands):
-        for command in commands:
-            self.__printer.send_now(command)
+        self.__printer.send_now(commands)
 
     def _advance_segment(self):
         if self._current_segment == 'none':

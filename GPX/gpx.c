@@ -406,6 +406,7 @@ void gpx_initialize(Gpx *gpx, int firstTime)
     
     gpx->current.position.a = 0.0;
     gpx->current.position.b = 0.0;
+    gpx->current.ready = 1;
 
     gpx->current.feedrate = get_home_feedrate(gpx, XYZ_BIT_MASK);
     gpx->current.extruder = 0;
@@ -1323,6 +1324,19 @@ static int get_extended_position(Gpx *gpx)
     write_8(gpx, 21);
     
     return end_frame(gpx);
+}
+
+static int wait_and_get_extended_position(Gpx *gpx)
+{
+  int rval = SUCCESS;
+
+  while (1) {
+    CALL( is_ready(gpx) );
+    if (gpx->current.ready) break;
+    usleep(100 * 1000);
+  }
+
+  return get_extended_position(gpx);
 }
 
 // 22 - Extended stop
@@ -2288,7 +2302,7 @@ static int queue_ext_point(Gpx *gpx, double feedrate)
         // uint16: feedrate in mm/s, multiplied by 64 to assist fixed point calculation on the bot
         write_16(gpx, (unsigned)(feedrate * 64.0));
         
-        return end_frame(gpx);        
+        return end_frame(gpx);  
 	}
     return SUCCESS;
 }
@@ -3818,8 +3832,11 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 // Load home positions from EEPROM
                 CALL( recall_home_positions(gpx) );
                 command_emitted++;
+
                 // clear loaded axes
                 gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
+                CALL( wait_and_get_extended_position(gpx) );
+                command_emitted++;
                 gpx->excess.a = 0;
                 gpx->excess.b = 0;
 
@@ -3921,7 +3938,8 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 CALL( home_axes(gpx, gpx->command.flag & XYZ_BIT_MASK, ENDSTOP_IS_MIN) );
                 command_emitted++;
                 // clear homed axes
-                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
+                CALL( wait_and_get_extended_position(gpx) );
+                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
                 gpx->excess.a = 0;
                 gpx->excess.b = 0;
                 break;
@@ -3931,7 +3949,8 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 CALL( home_axes(gpx, gpx->command.flag & XYZ_BIT_MASK, ENDSTOP_IS_MAX) );
                 command_emitted++;
                 // clear homed axes
-                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
+                CALL( wait_and_get_extended_position(gpx) );
+                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
                 gpx->excess.a = 0;
                 gpx->excess.b = 0;
                 break;
@@ -4179,6 +4198,8 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 
                 // M84 - Disable steppers until next move
             case 84:
+                CALL( wait_and_get_extended_position(gpx) );
+                
                 CALL( set_steppers(gpx, gpx->machine.extruder_count == 1 ? (XYZ_BIT_MASK | A_IS_SET) : AXES_BIT_MASK, 0) );
                 command_emitted++;
                 gpx->tool[A].motor_enabled = 0;
@@ -4253,6 +4274,12 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 // M115 - Get firmware version
             case 115:
                 CALL( get_advanced_version_number(gpx) );
+                command_emitted++;
+                break;
+
+                // M114 - Get current position
+            case 114:
+                CALL( wait_and_get_extended_position(gpx) );
                 command_emitted++;
                 break;
 
@@ -4486,7 +4513,8 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                     CALL( recall_home_positions(gpx) );
                     command_emitted++;
                     // clear loaded axes
-                    gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
+                    CALL( wait_and_get_extended_position(gpx); );
+                    gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
                     gpx->excess.a = 0;
                     gpx->excess.b = 0;
                 }
@@ -5097,6 +5125,8 @@ static void read_query_response(Gpx *gpx, Sio *sio, unsigned command, char *buff
             sio->response.isReady = read_8(gpx);
             VERBOSE( fprintf(gpx->log, "Printer is%sready" EOL,
                              sio->response.isReady ? " " : " not ") );
+
+            gpx->current.ready = sio->response.isReady;
             break;
             
             // 12 - Read from EEPROM
@@ -5190,14 +5220,22 @@ static void read_query_response(Gpx *gpx, Sio *sio, unsigned command, char *buff
                         sio->response.position.endstop.flag.zMax ? ", at max endstop" : "",
                         sio->response.position.endstop.flag.zMin ? ", at min endstop" : "");
                 fprintf(gpx->log, "A = %0.2fmm%s%s" EOL,
-                        (double)sio->response.position.a / gpx->machine.a.steps_per_mm,
+                        -(double)sio->response.position.a / gpx->machine.a.steps_per_mm,
                         sio->response.position.endstop.flag.aMax ? ", at max endstop" : "",
                         sio->response.position.endstop.flag.aMin ? ", at min endstop" : "");
                 fprintf(gpx->log, "B = %0.2fmm%s%s" EOL,
-                        (double)sio->response.position.b / gpx->machine.b.steps_per_mm,
+                        -(double)sio->response.position.b / gpx->machine.b.steps_per_mm,
                         sio->response.position.endstop.flag.bMax ? ", at max endstop" : "",
                         sio->response.position.endstop.flag.bMin ? ", at min endstop" : "");
             }
+
+            gpx->current.position.x = (double)sio->response.position.x / gpx->machine.x.steps_per_mm;
+            gpx->current.position.y = (double)sio->response.position.y / gpx->machine.y.steps_per_mm;
+            gpx->current.position.z = (double)sio->response.position.z / gpx->machine.z.steps_per_mm;
+            gpx->current.position.a = -(double)sio->response.position.a / gpx->machine.a.steps_per_mm;
+            gpx->current.position.b = -(double)sio->response.position.b / gpx->machine.b.steps_per_mm;
+            gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
+
             break;
                         
             // 22 - Extended stop

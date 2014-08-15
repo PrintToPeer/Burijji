@@ -116,6 +116,7 @@ class repWrapper:
             self.add_other_message({'action': 'print_paused', 'data': ''})
 
     def print_complete(self):
+        self._current_segment  = 'none'
         self.add_other_message({'action': 'print_complete', 'data': ''})
 
     def resume_print(self, fileno, data):

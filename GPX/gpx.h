@@ -268,6 +268,7 @@ extern "C" {
             int extruder;       // the currently selected extruder being used by the bot
             int offset;         // current G10 offset
             unsigned percent;   // current percent progress
+            int ready;          // is ready
         } current;
         
         struct {

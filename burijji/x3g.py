@@ -29,9 +29,12 @@ class X3GPrinter:
 
     threading.Thread(target=self._run).start()
 
-  def send_now(self, line):
+  def send_now(self, commands):
     with self.lock:
-      self.commands_to_send.insert(0, line.strip())
+      if type(commands) is list:
+        self.commands_to_send = commands + self.commands_to_send
+      else:
+        self.commands_to_send.insert(0, commands.strip())
 
   def send_many(self, lines):
     with self.lock:
@@ -153,7 +156,9 @@ class X3GPrinter:
 
   def end_print(self):
     with self.lock:
+      print "x3g.py end print"
       self.commands_to_send = []
+      self.is_sending_many = False
 
   def stop(self):
     self.running = False
