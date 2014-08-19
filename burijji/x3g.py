@@ -130,7 +130,7 @@ class X3GPrinter:
     with self.lock:
       if (not self.waiting_for_ok) and len(self.commands_to_send) > 0:
         command_to_send = self.commands_to_send[0]
-        self.commands_to_send = self.commands_to_send[1:]
+        del self.commands_to_send[0]
 
         try:
           self.waiting_for_ok = True
