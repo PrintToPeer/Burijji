@@ -72,8 +72,7 @@ class mbWrapper:
         printer.on_segment_end  = self._advance_segment
         sleep(3)
 
-        printer.send_now('M115')
-        printer.send_now('M114')
+        printer.send_now(['M115', 'M112', 'M114'])
 
         while self._server.running:
             sleep(1)
@@ -237,7 +236,7 @@ class mbWrapper:
         self.__printer.send_many(data)
 
     def _end_print(self):
-        if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
+        if 'cancel_print' in self._routines: self._send_commands(self._routines['cancel_print'])
         self.print_complete()
 
     def _stop_print(self):

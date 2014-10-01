@@ -2013,6 +2013,11 @@ static int display_message(Gpx *gpx, char *message, unsigned vPos, unsigned hPos
     else {
         if(length > 80) length = 80;
     }
+
+    // Hack: multipacket messages make the replicator 2 explode,
+    // despite following the protocol spec.
+    // So we have to just cut the text off.
+    if (length > maxLength) length = maxLength;
     
     while(bytesSent < length) {
         if(bytesSent + maxLength >= length) {
@@ -3834,7 +3839,7 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
                 command_emitted++;
 
                 // clear loaded axes
-                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);;
+                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
                 CALL( wait_and_get_extended_position(gpx) );
                 command_emitted++;
                 gpx->excess.a = 0;
@@ -4354,6 +4359,21 @@ int gpx_convert_line(Gpx *gpx, char *gcode_line)
 #endif
                 break;
                 
+                // M112 - Emergency Stop
+            case 112:
+                CALL( extended_stop(gpx, 1, 1) );
+                command_emitted++;
+
+                usleep(1000 * 1000); // 100ms
+                SHOW( fprintf(gpx->log, "Buffer cleared; querying position" EOL) );
+
+                gpx->axis.positionKnown &= ~(gpx->command.flag & gpx->axis.mask);
+                CALL( get_extended_position(gpx) );
+                command_emitted++;
+
+                SHOW( fprintf(gpx->log, "M112 Done" EOL) );
+
+                break;
                 
                 // M109 - Set extruder temperature and wait
             case 109:

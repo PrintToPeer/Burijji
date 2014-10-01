@@ -236,12 +236,21 @@ class repWrapper:
         self.__printer.startprint(gcoder.GCode(data))
 
     def _end_print(self):
-        if 'end_print' in self._routines: self._send_commands(self._routines['end_print'])
+        if 'cancel_print' in self._routines: self._send_commands(self._routines['cancel_print'])
         self.print_complete()
 
     def _stop_print(self):
+        self._mutex.acquire()
+        self.printing = False
+        self._mutex.release()
+
         self.__printer.endcb = None
         self.__printer.pause()
+
+        self._mutex.acquire()
+        self.printing = False
+        self._mutex.release()
+
         self._end_print()
 
     def _pause_print(self):
