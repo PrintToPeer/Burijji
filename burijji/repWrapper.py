@@ -5,6 +5,12 @@ from collections            import deque
 import threading
 import re
 
+import sys
+
+def log(message):
+  print message
+  sys.stdout.flush()
+
 class repWrapper:
     _temp_exp = re.compile("([TB]\d*):([-+]?\d*\.?\d*)")
     _uuid_exp = re.compile("UUID:([0-F]{8}-[0-F]{4}-4[0-F]{3}-[89AB][0-F]{3}-[0-F]{12})", re.I)
@@ -29,6 +35,16 @@ class repWrapper:
         self._current_segment  = 'none'
         self._gcode_file       = None
 
+        self.__printer.errorcb = self.errorcb
+        self.__printer.sendcb = self.sendcb
+        self.printer_lock = threading.Lock()
+
+    def errorcb(self, error):
+        log("* Error: " + error.strip())
+
+    def sendcb(self, command):
+        log("> " + command.strip())
+
     def start(self):
         threading.Thread(target=self._update).start()
         threading.Thread(target=self._run).start()
@@ -48,6 +64,9 @@ class repWrapper:
             other_messages   = list(self._other_messages)
             self._raw_output.clear()
             self._other_messages.clear()
+
+            log("- status ok? " + str(ok) + " __printer p:" + str(self.__printer.printing) + " ol:" + str(self.__printer.online) + " c:" + str(self.__printer.clear))
+
             self._mutex.release()
 
             if not self._ok:
@@ -72,12 +91,15 @@ class repWrapper:
         printer.endcb  = self._advance_segment
         printer.connect(self._server.port, self._server.baud)
         sleep(1)
-        printer.send_now('M115')
+
+        with self.printer_lock:
+            printer.send_now('M115')
 
 
         while self._server.running:
             sleep(1)
-            printer.send_now('M105')
+            with self.printer_lock:
+                printer.send_now('M105')
             self._mutex.acquire()
             self._current_line = printer.queueindex
             self._printing     = printer.printing
@@ -85,7 +107,8 @@ class repWrapper:
             self._ok           = (printer.writefailures < 10)
             self._mutex.release()
 
-        self.__printer.disconnect()
+        with self.printer_lock:
+            self.__printer.disconnect()
 
     def machine_info(self, fileno, data):
         self._server.add_to_queue(fileno, {'action': 'machine_info', 'data': self._machine_info})
@@ -201,10 +224,12 @@ class repWrapper:
         self._server.add_to_queue(fileno, {'action': 'data_error', 'data': 'Malformed data.'})
 
     def _send_commands(self, commands):
-        for command in commands:
-            self.__printer.send_now(command)
+        with self.printer_lock:
+            for command in commands:
+                self.__printer.send_now(command)
 
     def _advance_segment(self):
+        log("* Advance Segment c: " + self._current_segment)
         if self._current_segment == 'none':
             self._current_segment = 'starting'
             if 'start_print' in self._routines:
@@ -232,8 +257,32 @@ class repWrapper:
 
     def _delayed_start(self, data):
         sleep(0.1)
+        gcode = gcoder.GCode(data)
         self.__printer.endcb  = self._advance_segment
-        self.__printer.startprint(gcoder.GCode(data))
+
+        log("* Delayed start c: " + str(self.__printer.clear))
+        
+        print_started = False
+        while True:
+            with self.printer_lock:
+                log("* startprint attempt c: " + str(self.__printer.clear))
+                print_started = self.__printer.startprint(gcode)
+
+            if print_started:
+                break
+
+            sleep(0.1)
+
+
+        log("* Starting print. Total lines: " + str(len(data)))
+        log("* Clear: " + str(self.__printer.clear))
+        log("* GCode Sample:")
+        lines = 0
+        for line in data:
+          log("* ==> " + line.strip())
+          lines += 1
+          if lines > 30:
+            break
 
     def _end_print(self):
         if 'cancel_print' in self._routines: self._send_commands(self._routines['cancel_print'])
@@ -244,8 +293,9 @@ class repWrapper:
         self.printing = False
         self._mutex.release()
 
-        self.__printer.endcb = None
-        self.__printer.pause()
+        with self.printer_lock:
+            self.__printer.endcb = None
+            self.__printer.pause()
 
         self._mutex.acquire()
         self.printing = False
@@ -254,13 +304,16 @@ class repWrapper:
         self._end_print()
 
     def _pause_print(self):
-        self.__printer.pause()
+        with self.printer_lock:
+            self.__printer.pause()
 
     def _reumse_print(self):
-        self.__printer.resume()
+        with self.printer_lock:
+            self.__printer.resume()
 
     def _parse_line(self, line):
         self._mutex.acquire()
+        log("< " + line.strip())
         self._raw_output.append(line)
         self._mutex.release()
 
